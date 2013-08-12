@@ -3,7 +3,7 @@ Bulk-Create-Blogs
 
 A WordPress MU Plugin to allow the creation of blogs via CSV files.
 
-This plugin is a fork of Greg Breese's work, updated to work with newer versions of WordPress.
+This plugin is a fork of Greg Breese's work, updated by Ray Hoh to work with newer versions of WordPress.
 
 The file should be installed in wp-content/mu-plugins folder. 
 
