@@ -232,7 +232,7 @@ class bulk_create_from_csv
 	 	global $wpdb, $site_id;
 
 		// process form submission
-    	if ($_POST['action'] == 'update') {
+    		if ( ! empty( $_POST['action'] ) && $_POST['action'] == 'update' ) {
 			$errors = $this->import_data($_POST);
 			$messages = $errors->get_error_messages();
 			if( ! empty( $this->num_added ) ) { ?>
