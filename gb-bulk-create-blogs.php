@@ -1,66 +1,43 @@
 <?php
-/******************************************************************************************************************
+/*
 
-	Plugin Name: Bulk Create Blogs
-	Plugin URI:
-	Description: WordPressMU plugin for site admin to allow the bulk creation of blogs using CSV data.
-	Version: 2.0
-	Author: Greg Breese (gregsurname@gmail.com)
+Plugin Name: Bulk Create Blogs
+Plugin URI:
+Description: WordPressMU plugin for site admin to allow the bulk creation of blogs using CSV data.
+Version: 2.0
+Author: Greg Breese (gregsurname@gmail.com)
 
-	Installation: Just place this file in your wp-content/mu-plugins/ directory.
+Installation: Just place this file in your wp-content/mu-plugins/ directory.
 
-	Usage: A page is created under the Site Admin menu called "Bulk Create Blogs"
+Usage: A page is created under the Site Admin menu called "Bulk Create Blogs"
 
-	To use the plugin you must create correctly formatted data. The plugin takes
-	CSV formatted data where each row contains the following data.
+To use the plugin you must create correctly formatted data. The plugin takes CSV formatted data where each row contains the following data: domain, user_id, blog_title, blog_topic,
 
-		domain, user_id, blog_title, blog_topic,
+Each of these fields is described below.
 
-	Each of these fields is described below.
-		blog_domain (Mandatory): the domain name of the blog, this should only contain
-			alphanumeric characters and be in all lowercase. If the blog domain is empty
-			then users will be added to the site's root blog.
-		user_name (Mandatory): the login id of the user to be added to the blog.
-		blog_title (Optional): the title of the blog.
-		blog_topic (Optional): the name of the blog topic that this blog will be categorised
-			under. These topics are setup under the 'Blog Topic Management' tab. A blog_title
-			must be chosen if you wish to set the blog topic. (Requires cets_blog_topics plugin.)
+blog_domain (Mandatory): the domain name of the blog, this should only contain alphanumeric characters and be in all lowercase. If the blog domain is empty then users will be added to the site's root blog.
 
-	When each line is processed, if the blog named already exists then the user given
-	is added to the blog. If the blog does not exist then it is created. If a blog title
-	is not provided then the blog domain is used.
+user_name (Mandatory): the login id of the user to be added to the blog.
+blog_title (Optional): the title of the blog.
+blog_topic (Optional): the name of the blog topic that this blog will be categorised under. These topics are setup under the 'Blog Topic Management' tab. A blog_title must be chosen if you wish to set the blog topic. (Requires cets_blog_topics plugin.)
 
-	This plugin also provides support for LDAP user creation. If a user does not exist and
-	the ldap_auth plugin is installed then it will attempt to create a new user.
+When each line is processed, if the blog named already exists then the user given is added to the blog. If the blog does not exist then it is created. If a blog title is not provided then the blog domain is used.
 
-	At the moment this plugin only supports sites that use domain blog naming. Support for
-	sub-directories is not planned but you could easily add it yourself.
+This plugin also provides support for LDAP user creation. If a user does not exist and the ldap_auth plugin is installed then it will attempt to create a new user.
 
-	The number of blogs that can be imported at a time is limited due to php's
-	max_execution_time.	You can change the defined limit at the top of the code, but
-	if you do then I suggest increasing	your max_execution_time in your php.ini. Having
-	the script get cut off half way through creating a blog may lead to undocumented
-	behaviour. 	:)
+At the moment this plugin only supports sites that use domain blog naming. Support for sub-directories is not planned but you could easily add it yourself.
 
-	Copyright:
+The number of blogs that can be imported at a time is limited due to php's max_execution_time. You can change the defined limit at the top of the code, but if you do then I suggest increasing your max_execution_time in your php.ini. Having the script get cut off half way through creating a blog may lead to undocumented behaviour. 	:)
 
-		Copyright 2010 Greg Breese
+Copyright: Copyright 2010 Greg Breese
 
-	    This program is free software; you can redistribute it and/or modify
-	    it under the terms of the GNU General Public License as published by
-	    the Free Software Foundation; either version 2 of the License, or
-	    (at your option) any later version.
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
-	    This program is distributed in the hope that it will be useful,
-	    but WITHOUT ANY WARRANTY; without even the implied warranty of
-	    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	    GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more detail.
 
-	    You should have received a copy of the GNU General Public License
-	    along with this program; if not, write to the Free Software
-	    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+You should have received a copy of the GNU General Public License along with this program; if not, write to the Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-*******************************************************************************************************************/
+*/
 
 /* 	Limit blogs created each time script is run. This has to be done because
 	otherwise script can easily time out due php's max_execution_time ...
