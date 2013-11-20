@@ -128,8 +128,8 @@ class bulk_create_from_csv
 		}
 
 		//check if user exists
-		$user_id = get_user_id_from_string($data_row[1]);
-		if ($user_id == null) {
+		$user_id = self::get_user( $data_row[1] );
+		if ( empty( $user_id ) ) {
 			// Try to create the user from LDAP details
 			if( function_exists('wpmuSetupLdapOptions') ) {
 				$ldapString = wpmuSetupLdapOptions();
@@ -315,6 +315,38 @@ class bulk_create_from_csv
 			'bulk_create_management_page',
 			array( &$this, 'bulk_create_management_page' )
 		);
+	}
+
+	/** HELPER METHODS ************************************************/
+
+	/**
+	 * Static method to query a user's data to return the user ID.
+	 *
+	 * Can pass either the user ID, email, login or nicename.
+	 *
+	 * @since 3.0
+	 *
+	 * @param int|string $string Either user ID, user email or user login / nicename
+	 * @return int The user ID
+	 */
+	public static function get_user( $string = '' ) {
+		if ( is_email( $string ) ) {
+			$user = get_user_by( 'email', $string );
+		} elseif ( is_numeric( $string ) ) {
+			$user = get_user_by( 'id',    $string );
+		} else {
+			$user = get_user_by( 'login', $string );
+
+			if ( empty( $user ) ) {
+				$user = get_user_by( 'slug', $string );
+			}
+		}
+
+		if ( $user ) {
+			return $user->ID;
+		}
+
+		return 0;
 	}
 };
 
