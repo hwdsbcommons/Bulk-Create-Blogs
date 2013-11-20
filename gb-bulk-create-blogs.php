@@ -255,7 +255,7 @@ class Bulk_Create_From_CSV {
 	public function bulk_create_management_page(){
 
 		// process form submission
-    		if ( ! empty( $_POST['action'] ) && $_POST['action'] == 'update' ) {
+		if ( ! empty( $_POST['action'] ) && $_POST['action'] == 'update' ) {
 			// More Privacy Options plugin check
 			// Disables annoying super admin email
     			global $ds_more_privacy_options;
@@ -288,7 +288,7 @@ class Bulk_Create_From_CSV {
     	}
 ?>
 
-	        <form name="blogdefaultsform" action="" method="post">
+		<form name="blogdefaultsform" action="" method="post">
 
 	        <div class="wrap">
 	        	<h2><?php _e('Bulk Create Blogs') ?></h2>
