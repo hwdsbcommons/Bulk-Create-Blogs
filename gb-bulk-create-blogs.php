@@ -272,7 +272,7 @@ class bulk_create_from_csv
 	        <table class="form-table">
 				<tr valign="top">
 					<th scope="row"><?php _e('Site') ?></th>
-					<td ><strong><?php echo $wpdb->get_var( $wpdb->prepare("SELECT domain FROM $wpdb->site WHERE id = %s", $site_id)); ?></strong>
+					<td ><strong><?php self::the_site(); ?></strong>
 					<p>Please check that this is the site that you wish to import blogs into!</p></td></tr>
 					<tr valign="top"><th scope="row"><?php _e('Permissions') ?></th>
 					<td>What user level would you like the users to be set to?<br>
@@ -345,7 +345,26 @@ class bulk_create_from_csv
 
 		return 0;
 	}
-};
+
+	/**
+	 * Outputs the site.
+	 *
+	 * Works in either subdirectory or subdomain installs.
+	 *
+	 * @since 3.0
+	 */
+	public static function the_site() {
+		global $current_site;
+
+		if ( is_subdomain_install() ) {
+			$site = preg_replace( '|^www\.|', '', $current_site->domain );
+		} else {
+			$site = $current_site->domain . $current_site->path;
+		}
+
+		echo $site;
+	}
+}
 
 // Initialize the class
 $bulk_create_from_csv_instance = new bulk_create_from_csv();
