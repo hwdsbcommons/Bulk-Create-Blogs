@@ -374,13 +374,16 @@ class Bulk_Create_From_CSV {
 	public static function get_user( $string = '' ) {
 		if ( is_email( $string ) ) {
 			$user = get_user_by( 'email', $string );
-		} elseif ( is_numeric( $string ) ) {
-			$user = get_user_by( 'id',    $string );
+
 		} else {
 			$user = get_user_by( 'login', $string );
 
 			if ( empty( $user ) ) {
 				$user = get_user_by( 'slug', $string );
+			}
+
+			if ( empty( $user ) && is_numeric( $string ) ) {
+				$user = get_user_by( 'id',   $string );
 			}
 		}
 
