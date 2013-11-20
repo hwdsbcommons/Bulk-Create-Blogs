@@ -162,99 +162,64 @@ class bulk_create_from_csv
 			}
 		}
 
-		// see if blog already exists for domain
-		$site_domain = $wpdb->get_var( $wpdb->prepare("SELECT domain FROM $wpdb->site WHERE id = %s", $site_id) );
-		if($data_row[0] == "") {
-			$new_domain = $site_domain;
-			$new_path = "/";
+		$domain = $data_row[0];
+
+		// subdomain install
+		if ( is_subdomain_install() ) {
+			$newdomain = $domain . '.' . preg_replace( '|^www\.|', '', $current_site->domain );
+			$path      = $current_site->path;
+
+		// subdirectory install
 		} else {
-			if(defined('VHOST') && VHOST == 'yes') {
-				// sub-domain sites
-				$domain_prefix = strtolower($data_row[0]);
-				$new_domain = "$domain_prefix.$site_domain";
-				$new_path = "/";
+			$subdirectory_reserved_names = apply_filters( 'subdirectory_reserved_names', array( 'page', 'comments', 'blog', 'files', 'feed' ) );
+			if ( in_array( $domain, $subdirectory_reserved_names ) ) {
+				$this->errors->add(
+					'domain_reserved',
+					sprintf( __('The following words are reserved for use by WordPress functions and cannot be used as blog names: <code>%s</code>' ), implode( '</code>, <code>', $subdirectory_reserved_names ) )
+				);
 
-			} else {
-				// sub-directory sites
-				$new_domain = $site_domain;
-				$new_path = "/".strtolower($data_row[0])."/";
-			}
-
-		}
-		$new_blog_id = $this->find_blog_id_by_domain_and_path($new_domain, $new_path);
-		if( !is_wp_error($new_blog_id)) {
-			// Blog already exists, add user and exit.
-			//switch_to_blog($new_blog_id);
-			//add_user_to_blog($new_blog_id, $user_id, $_POST[role]);
-			$this->errors->add( 'site_exists', "The site {$new_path} already exists." );
-			$this->num_failed++;
-			return;
-		}
-
-		if( $new_blog_id->errors['no_blog_exists'] ) {
-			// Create a new blog
-
-			// set title
-			if (sizeof($data_row) > 2) {
-				$title = $data_row[2];
-			}
-			else {
-				$title = $data_row[0];
-			}
-
-			// create an empty blog
-			$new_blog_id = $this->gb_create_empty_blog($new_domain, $new_path, $title, $site_id);
-			if ( is_wp_error($new_blog_id) ) {
-				// couldn't create blog error
-				$this->errors->add('failed_to_create_blog',"Couldn't create blog $new_domain on line $this->lines_processed.");
 				$this->num_failed++;
 				return;
 			}
 
-			switch_to_blog($new_blog_id);
-			update_option('blogname', $title);
-			// Add the user
-			add_user_to_blog($new_blog_id, $user_id, $_POST[role]);
-			// Install defaults
-			install_blog_defaults($new_blog_id, $user_id);
+			$newdomain = $current_site->domain;
+			$path      = $current_site->path . $domain . '/';
+		}
 
-			if ( is_array($meta) ) foreach ($meta as $key => $value) {
-				update_blog_status( $new_blog_id, $key, $value );
-				update_blog_option( $new_blog_id, $key, $value );
-			}
+		// set title
+		if ( sizeof( $data_row ) > 2 ) {
+			$title = $data_row[2];
+		} else {
+			// fallback to blog slug if no title
+			$title = $data_row[0];
+		}
 
-			add_blog_option( $new_blog_id, 'WPLANG', get_site_option( 'WPLANG' ) );
+		// install the blog
+		$new_blog_id = wpmu_create_blog( $newdomain, $path, $title, $user_id, array( 'public' => 1 ) );
 
-			if(get_user_meta( $user_id, 'primary_blog' ) == 1 )
-				update_user_meta( $user_id, 'primary_blog', $new_blog_id );
-
-			do_action( 'wpmu_new_blog', $blog_id, $user_id, $new_domain, $new_path, 1, $meta );
-
-			// check if cets_blog_topic exists
-			if( function_exists('cets_get_topic_id_from_name') && sizeof($data_row) > 3) {
-				$topic_id = cets_get_topic_id_from_name($data_row[3]);
-				if ($topic_id == null) {
-					// topic does not exist, try creating it
-					//add_topic($data_row[3]);
-					$this->errors->add('no_blog_topic',"The blog topic $data_row[3] does not exist on line $this->lines_processed. Blog created without topic.");
-					return;
-				}
-				// set blog topic
-				cets_set_blog_topic($new_blog_id, $topic_id);
-			}
-
-			do_action('gb_bulk_create_blogs_import_blog', $new_blog_id);
-			$this->num_added++;
-			return;
-		} else if( $new_blog_id->errors[blog_not_in_site]) {
-			// blog not in site error
-			$this->errors->add('blog_not_in_site',"Couldn't add user to blog $new_domain on line $this->lines_processed because this blog is not in the current site.");
+		// error in creating blog
+		if ( is_wp_error( $new_blog_id ) ) {
+			$new_blog_error_msg = $new_blog_id->get_error_message();
+			$this->errors->add('failed_to_create_blog',"Couldn't create blog $path on line $this->lines_processed. Error message is: '$new_blog_error_msg'");
 			$this->num_failed++;
 			return;
 		}
 
-		$this->errors->add('unknown error',"Unknown error on line 	.");
-		$this->num_failed++;
+		// check if cets_blog_topic exists
+		if( function_exists('cets_get_topic_id_from_name') && sizeof($data_row) > 3) {
+			$topic_id = cets_get_topic_id_from_name($data_row[3]);
+			if ( $topic_id == null ) {
+				// topic does not exist, try creating it
+				//add_topic($data_row[3]);
+				$this->errors->add('no_blog_topic',"The blog topic $data_row[3] does not exist on line $this->lines_processed. Blog created without topic.");
+				return;
+			}
+			// set blog topic
+			cets_set_blog_topic($new_blog_id, $topic_id);
+		}
+
+		do_action('gb_bulk_create_blogs_import_blog', $new_blog_id);
+		$this->num_added++;
 		return;
 	}
 
@@ -339,275 +304,6 @@ class bulk_create_from_csv
 
 		// End of management page
 	 }
-
-	// returns the blog_id for a given domain
-	// $domain must be the fully qualified domain name of the blog.
-	// Checks that the blog belongs to the currently set site.
-	public function find_blog_id_by_domain_and_path( $domain, $path) {
-		global $wpdb, $site_id;
-
-		$query = "SELECT * FROM {$wpdb->blogs} WHERE domain='" . $wpdb->escape($domain) . "' AND path='" . $wpdb->escape($path) . "' LIMIT 1";
-		$blog = $wpdb->get_row($query);
-		if($blog) {
-			if( $blog->site_id == $site_id) {
-				return $blog->blog_id;
-			} else {
-				return new WP_Error('blog_not_in_site', __('The blog does not belong to the current site.'));
-			}
-		} else {
-			return new WP_Error('no_blog_exists',__('Blog does not exist.'));
-		}
-	}
-
-	// Creates an empty blog with no content loaded.
-	// Calls refresh_wp_queries() so can be used more than once
-	// per WP instance.
-	public function gb_create_empty_blog( $domain, $path, $weblog_title, $site_id = 1 ) {
-		$domain       = addslashes( $domain );
-		$weblog_title = addslashes( $weblog_title );
-
-		if( empty($path) )
-			$path = '/';
-
-		// Check if the domain has been used already. We should return an error message.
-		if ( domain_exists($domain, $path, $site_id) )
-			return new WP_Error('blog_url_taken', "Blog URL already taken.");
-
-		// Need to backup wpdb table names, and create a new wp_blogs entry for new blog.
-		// Need to get blog_id from wp_blogs, and create new table names.
-		// Must restore table names at the end of function.
-
-		if ( ! $blog_id = insert_blog($domain, $path, $site_id) )
-			return new WP_Error('could_not_create_blog', "Couldn't create blog.");
-
-		switch_to_blog($blog_id);
-		$this->refresh_wp_queries();
-		install_blog($blog_id);
-		restore_current_blog();
-
-		return $blog_id;
-	}
-
-	// Refreshes the wp_queries global variable, required to create more than
-	// one new blog in a WP instance.
-	// These values are just copied out of wp-admin/includes/schema.php from wpmu version 2.6
-	public function refresh_wp_queries () {
-		global $wpdb, $wp_queries;
-
-		$wp_queries="CREATE TABLE $wpdb->terms (
-		 term_id bigint(20) NOT NULL auto_increment,
-		 name varchar(200) NOT NULL default '',
-		 slug varchar(200) NOT NULL default '',
-		 term_group bigint(10) NOT NULL default 0,
-		 PRIMARY KEY  (term_id),
-		 UNIQUE KEY slug (slug),
-		 KEY name (name)
-		) $charset_collate;
-		CREATE TABLE $wpdb->term_taxonomy (
-		 term_taxonomy_id bigint(20) NOT NULL auto_increment,
-		 term_id bigint(20) NOT NULL default 0,
-		 taxonomy varchar(32) NOT NULL default '',
-		 description longtext NOT NULL,
-		 parent bigint(20) NOT NULL default 0,
-		 count bigint(20) NOT NULL default 0,
-		 PRIMARY KEY  (term_taxonomy_id),
-		 UNIQUE KEY term_id_taxonomy (term_id,taxonomy)
-		) $charset_collate;
-		CREATE TABLE $wpdb->term_relationships (
-		 object_id bigint(20) NOT NULL default 0,
-		 term_taxonomy_id bigint(20) NOT NULL default 0,
-		 term_order int(11) NOT NULL default 0,
-		 PRIMARY KEY  (object_id,term_taxonomy_id),
-		 KEY term_taxonomy_id (term_taxonomy_id)
-		) $charset_collate;
-		CREATE TABLE $wpdb->comments (
-		  comment_ID bigint(20) unsigned NOT NULL auto_increment,
-		  comment_post_ID int(11) NOT NULL default '0',
-		  comment_author tinytext NOT NULL,
-		  comment_author_email varchar(100) NOT NULL default '',
-		  comment_author_url varchar(200) NOT NULL default '',
-		  comment_author_IP varchar(100) NOT NULL default '',
-		  comment_date datetime NOT NULL default '0000-00-00 00:00:00',
-		  comment_date_gmt datetime NOT NULL default '0000-00-00 00:00:00',
-		  comment_content text NOT NULL,
-		  comment_karma int(11) NOT NULL default '0',
-		  comment_approved varchar(20) NOT NULL default '1',
-		  comment_agent varchar(255) NOT NULL default '',
-		  comment_type varchar(20) NOT NULL default '',
-		  comment_parent bigint(20) NOT NULL default '0',
-		  user_id bigint(20) NOT NULL default '0',
-		  PRIMARY KEY  (comment_ID),
-		  KEY comment_approved (comment_approved),
-		  KEY comment_post_ID (comment_post_ID),
-		  KEY comment_approved_date_gmt (comment_approved,comment_date_gmt),
-		  KEY comment_date_gmt (comment_date_gmt)
-		) $charset_collate;
-		CREATE TABLE $wpdb->links (
-		  link_id bigint(20) NOT NULL auto_increment,
-		  link_url varchar(255) NOT NULL default '',
-		  link_name varchar(255) NOT NULL default '',
-		  link_image varchar(255) NOT NULL default '',
-		  link_target varchar(25) NOT NULL default '',
-		  link_category bigint(20) NOT NULL default '0',
-		  link_description varchar(255) NOT NULL default '',
-		  link_visible varchar(20) NOT NULL default 'Y',
-		  link_owner int(11) NOT NULL default '1',
-		  link_rating int(11) NOT NULL default '0',
-		  link_updated datetime NOT NULL default '0000-00-00 00:00:00',
-		  link_rel varchar(255) NOT NULL default '',
-		  link_notes mediumtext NOT NULL,
-		  link_rss varchar(255) NOT NULL default '',
-		  PRIMARY KEY  (link_id),
-		  KEY link_category (link_category),
-		  KEY link_visible (link_visible)
-		) $charset_collate;
-		CREATE TABLE $wpdb->options (
-		  option_id bigint(20) NOT NULL auto_increment,
-		  blog_id int(11) NOT NULL default '0',
-		  option_name varchar(64) NOT NULL default '',
-		  option_value longtext NOT NULL,
-		  autoload varchar(20) NOT NULL default 'yes',
-		  PRIMARY KEY  (option_id,blog_id,option_name),
-		  KEY option_name (option_name)
-		) $charset_collate;
-		CREATE TABLE $wpdb->postmeta (
-		  meta_id bigint(20) NOT NULL auto_increment,
-		  post_id bigint(20) NOT NULL default '0',
-		  meta_key varchar(255) default NULL,
-		  meta_value longtext,
-		  PRIMARY KEY  (meta_id),
-		  KEY post_id (post_id),
-		  KEY meta_key (meta_key)
-		) $charset_collate;
-		CREATE TABLE $wpdb->posts (
-		  ID bigint(20) unsigned NOT NULL auto_increment,
-		  post_author bigint(20) NOT NULL default '0',
-		  post_date datetime NOT NULL default '0000-00-00 00:00:00',
-		  post_date_gmt datetime NOT NULL default '0000-00-00 00:00:00',
-		  post_content longtext NOT NULL,
-		  post_title text NOT NULL,
-		  post_category int(4) NOT NULL default '0',
-		  post_excerpt text NOT NULL,
-		  post_status varchar(20) NOT NULL default 'publish',
-		  comment_status varchar(20) NOT NULL default 'open',
-		  ping_status varchar(20) NOT NULL default 'open',
-		  post_password varchar(20) NOT NULL default '',
-		  post_name varchar(200) NOT NULL default '',
-		  to_ping text NOT NULL,
-		  pinged text NOT NULL,
-		  post_modified datetime NOT NULL default '0000-00-00 00:00:00',
-		  post_modified_gmt datetime NOT NULL default '0000-00-00 00:00:00',
-		  post_content_filtered text NOT NULL,
-		  post_parent bigint(20) NOT NULL default '0',
-		  guid varchar(255) NOT NULL default '',
-		  menu_order int(11) NOT NULL default '0',
-		  post_type varchar(20) NOT NULL default 'post',
-		  post_mime_type varchar(100) NOT NULL default '',
-		  comment_count bigint(20) NOT NULL default '0',
-		  PRIMARY KEY  (ID),
-		  KEY post_name (post_name),
-		  KEY type_status_date (post_type,post_status,post_date,ID)
-		) $charset_collate;
-		CREATE TABLE IF NOT EXISTS $wpdb->users (
-		  ID bigint(20) unsigned NOT NULL auto_increment,
-		  user_login varchar(60) NOT NULL default '',
-		  user_pass varchar(64) NOT NULL default '',
-		  user_nicename varchar(50) NOT NULL default '',
-		  user_email varchar(100) NOT NULL default '',
-		  user_url varchar(100) NOT NULL default '',
-		  user_registered datetime NOT NULL default '0000-00-00 00:00:00',
-		  user_activation_key varchar(60) NOT NULL default '',
-		  user_status int(11) NOT NULL default '0',
-		  display_name varchar(250) NOT NULL default '',
-		  spam tinyint(2) NOT NULL default '0',
-		  deleted tinyint(2) NOT NULL default '0',
-		  PRIMARY KEY  (ID),
-		  KEY user_login_key (user_login),
-		  KEY user_nicename (user_nicename)
-		) $charset_collate;
-		CREATE TABLE IF NOT EXISTS $wpdb->usermeta (
-		  umeta_id bigint(20) NOT NULL auto_increment,
-		  user_id bigint(20) NOT NULL default '0',
-		  meta_key varchar(255) default NULL,
-		  meta_value longtext,
-		  PRIMARY KEY  (umeta_id),
-		  KEY user_id (user_id),
-		  KEY meta_key (meta_key)
-		) $charset_collate;
-		CREATE TABLE IF NOT EXISTS $wpdb->blogs (
-		  blog_id bigint(20) NOT NULL auto_increment,
-		  site_id bigint(20) NOT NULL default '0',
-		  domain varchar(200) NOT NULL default '',
-		  path varchar(100) NOT NULL default '',
-		  registered datetime NOT NULL default '0000-00-00 00:00:00',
-		  last_updated datetime NOT NULL default '0000-00-00 00:00:00',
-		  public tinyint(2) NOT NULL default '1',
-		  archived enum('0','1') NOT NULL default '0',
-		  mature tinyint(2) NOT NULL default '0',
-		  spam tinyint(2) NOT NULL default '0',
-		  deleted tinyint(2) NOT NULL default '0',
-		  lang_id int(11) NOT NULL default '0',
-		  PRIMARY KEY  (blog_id),
-		  KEY domain (domain(50),path(5)),
-		  KEY lang_id (lang_id)
-		) $charset_collate;
-		CREATE TABLE IF NOT EXISTS $wpdb->blog_versions (
-		  blog_id bigint(20) NOT NULL default '0',
-		  db_version varchar(20) NOT NULL default '',
-		  last_updated datetime NOT NULL default '0000-00-00 00:00:00',
-		  PRIMARY KEY  (blog_id),
-		  KEY db_version (db_version)
-		) $charset_collate;
-		CREATE TABLE IF NOT EXISTS $wpdb->registration_log (
-		  ID bigint(20) NOT NULL auto_increment,
-		  email varchar(255) NOT NULL default '',
-		  IP varchar(30) NOT NULL default '',
-		  blog_id bigint(20) NOT NULL default '0',
-		  date_registered datetime NOT NULL default '0000-00-00 00:00:00',
-		  PRIMARY KEY  (ID),
-		  KEY IP (IP)
-		) $charset_collate;
-		CREATE TABLE IF NOT EXISTS $wpdb->site (
-		  id bigint(20) NOT NULL auto_increment,
-		  domain varchar(200) NOT NULL default '',
-		  path varchar(100) NOT NULL default '',
-		  PRIMARY KEY  (id),
-		  KEY domain (domain,path)
-		) $charset_collate;
-		CREATE TABLE IF NOT EXISTS $wpdb->sitemeta (
-		  meta_id bigint(20) NOT NULL auto_increment,
-		  site_id bigint(20) NOT NULL default '0',
-		  meta_key varchar(255) default NULL,
-		  meta_value longtext,
-		  PRIMARY KEY  (meta_id),
-		  KEY meta_key (meta_key),
-		  KEY site_id (site_id)
-		) $charset_collate;
-		CREATE TABLE IF NOT EXISTS $wpdb->sitecategories (
-		  cat_ID bigint(20) NOT NULL auto_increment,
-		  cat_name varchar(55) NOT NULL default '',
-		  category_nicename varchar(200) NOT NULL default '',
-		  last_updated timestamp NOT NULL,
-		  PRIMARY KEY  (cat_ID),
-		  KEY category_nicename (category_nicename),
-		  KEY last_updated (last_updated)
-		) $charset_collate;
-		CREATE TABLE IF NOT EXISTS $wpdb->signups (
-		  domain varchar(200) NOT NULL default '',
-		  path varchar(100) NOT NULL default '',
-		  title longtext NOT NULL,
-		  user_login varchar(60) NOT NULL default '',
-		  user_email varchar(100) NOT NULL default '',
-		  registered datetime NOT NULL default '0000-00-00 00:00:00',
-		  activated datetime NOT NULL default '0000-00-00 00:00:00',
-		  active tinyint(1) NOT NULL default '0',
-		  activation_key varchar(50) NOT NULL default '',
-		  meta longtext,
-		  KEY activation_key (activation_key),
-		  KEY domain (domain)
-		) $charset_collate;
-		";
-	}
 
 	//Add the site-wide administrator menu
 	public function add_siteadmin_page(){
