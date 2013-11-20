@@ -230,6 +230,13 @@ class bulk_create_from_csv
 
 		// process form submission
     		if ( ! empty( $_POST['action'] ) && $_POST['action'] == 'update' ) {
+			// More Privacy Options plugin check
+			// Disables annoying super admin email
+    			global $ds_more_privacy_options;
+    			if ( ! empty( $ds_more_privacy_options ) ) {
+				remove_action( 'update_blog_public', array( $ds_more_privacy_options,'ds_mail_super_admin' ) );
+			}
+
 			$errors = $this->import_data($_POST);
 			$messages = $errors->get_error_messages();
 			if( ! empty( $this->num_added ) ) { ?>
