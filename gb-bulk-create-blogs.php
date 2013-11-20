@@ -227,9 +227,6 @@ class bulk_create_from_csv
 
 	*/
 	function bulk_create_management_page(){
-	 	// Display the defaults that can be set by site admins
-
-	 	global $wpdb, $site_id;
 
 		// process form submission
     		if ( ! empty( $_POST['action'] ) && $_POST['action'] == 'update' ) {
