@@ -315,14 +315,6 @@ class Bulk_Create_From_CSV {
 					</td>
 				</tr>
 
-				<tr>
-					<th scope="row"><?php _e('Permissions') ?></th>
-					<td>
-						What user level would you like the users to be set to?<br />
-						<select name="role"><?php wp_dropdown_roles(); ?></select>
-					</td>
-				</tr>
-
 				<?php
 					// hook for other plugins to add to interface
 					do_action('gb_bulk_create_blogs_form');
