@@ -102,7 +102,7 @@ class bulk_create_from_csv
 
 	*/
 	public function import_row($data_row) {
-		global $wpdb, $site_id;
+		global $wpdb, $current_site;
 
 		// split the row up and trim whitespace
 		$data_row = preg_split("/\s*,\s*/", $data_row, 5 );
