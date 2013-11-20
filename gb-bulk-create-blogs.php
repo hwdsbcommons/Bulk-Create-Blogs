@@ -266,11 +266,6 @@ class bulk_create_from_csv
 
 	 	global $wpdb, $site_id;
 
-		// only allow site admins to come here.
-		if( is_site_admin() == false ) {
-			wp_die( __('You do not have permission to access this page.') );
-		}
-
 		// process form submission
     	if ($_POST['action'] == 'update') {
 			$errors = $this->import_data($_POST);
@@ -616,14 +611,19 @@ class bulk_create_from_csv
 
 	//Add the site-wide administrator menu
 	public function add_siteadmin_page(){
-       add_submenu_page('wpmu-admin.php', 'Bulk Create Blogs', 'Bulk Create Blogs', 10, 'bulk_create_management_page', array(&$this, 'bulk_create_management_page'));
-
-	 }
+		add_submenu_page(
+			'sites.php',
+			'Bulk Create Blogs',
+			'Bulk Create Blogs',
+			'manage_sites',
+			'bulk_create_management_page',
+			array( &$this, 'bulk_create_management_page' )
+		);
+	}
 };
 
-
+// Initialize the class
 $bulk_create_from_csv_instance = new bulk_create_from_csv();
 
-
 // Add the site admin config page
-add_action('admin_menu', array(&$bulk_create_from_csv_instance, 'add_siteadmin_page'));
+add_action( 'network_admin_menu', array( &$bulk_create_from_csv_instance, 'add_siteadmin_page' ) );
